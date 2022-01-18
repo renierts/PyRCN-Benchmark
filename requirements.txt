@@ -1,0 +1,7 @@
+joblib
+matplotlib
+pandas
+pyrcn==0.0.15
+seaborn
+scikit-learn>=1.0
+jupyterlab
