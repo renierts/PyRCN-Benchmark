@@ -1,7 +1,11 @@
+numpy
 joblib
-matplotlib
+pyrcn
 pandas
-pyrcn==0.0.15
+statsmodels
+scikit-learn
+arch
 seaborn
-scikit-learn>=1.0
 jupyterlab
+reservoirpy
+hpelm
