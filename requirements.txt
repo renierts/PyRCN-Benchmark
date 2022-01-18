@@ -6,6 +6,6 @@ statsmodels
 scikit-learn
 arch
 seaborn
-jupyterlab
 reservoirpy
 hpelm
+jupyterlab
