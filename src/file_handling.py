@@ -17,13 +17,3 @@ def export_results(results, filename):
     """Store the results as a csv file."""
     df = pd.DataFrame.from_dict(results)
     df.to_csv(filename, sep=',', index=False)
-
-
-def serialize_model(model, filename):
-    """Store a fitted model in the binary pickle file format."""
-    dump(model, filename=filename)
-
-
-def deserialize_model(filename):
-    """Load a fitted model in the binary pickle file format."""
-    return load(filename)

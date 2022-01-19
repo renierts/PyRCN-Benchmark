@@ -18,17 +18,17 @@ def ts2super(ts: DataFrame, n_lags: int, h: int):
     """
     # Creating dataframe with lags
     lags = range(1, n_lags)
-    data_super_lags = ts.assign(**{'{} (t-{})'.format(col, t): ts[col].shift(t)
-                                   for t in lags for col in ts})
+    data_super_lags = DataFrame(ts).assign(
+        **{f'{col} (t-{t})': ts[col].shift(t) for t in lags for col in ts})
     # Reversing column orders in dataframe with lags
     data_super_lags = data_super_lags[data_super_lags.columns[::-1]]
     # Slicing dataframe with legs to get a single column with current values
     ts_at_zero = pd.DataFrame(data_super_lags.iloc[:, -1])
     # Creating dataframe with future values
     future = range(1, h + 1)
-    data_super_future = ts_at_zero.assign(**{
-        '{} (t+{})'.format(col, t): ts_at_zero[col].shift(-t)
-        for t in future for col in ts_at_zero})
+    data_super_future = ts_at_zero.assign(
+        **{f'{col} (t+{t})': ts_at_zero[col].shift(-t)
+           for t in future for col in ts_at_zero})
     # Joining lags and future values
     data_super = data_super_lags.join(data_super_future.iloc[:, 1:]).dropna()
     data_super = data_super.reset_index(drop=True)

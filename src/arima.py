@@ -5,6 +5,8 @@ from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import TimeSeriesSplit
 from statsmodels.tsa.arima.model import ARIMA
 import warnings
+from itertools import product
+from joblib import Parallel, delayed
 
 
 warnings.filterwarnings("ignore")
@@ -24,7 +26,7 @@ def fit_predict(ts_train, ts_test, arima_order, H):
     """
     train_model = ARIMA(ts_train, order=arima_order)
     train_model_fit = train_model.fit()
-    train_pred = train_model_fit.predict().values.reshape(-1, 1)
+    train_pred = train_model_fit.predict().reshape(-1, 1)
 
     history = [x for x in ts_train]
     predictions = list()
@@ -33,11 +35,24 @@ def fit_predict(ts_train, ts_test, arima_order, H):
         model_fit = model.fit()
         yhat = model_fit.forecast(steps=H)[0]
         predictions.append(yhat)
-        history.append(ts_test.iloc[t])
+        history.append(ts_test[t])
 
     test_pred = np.array(predictions[:-H]).reshape(-1, 1)
 
     return train_pred, test_pred
+
+
+def optimization_step(p, d, q, ts_train, ts_test, H):
+    order = (p, d, q)
+    print(order)
+    try:
+        _, y_hat = fit_predict(ts_train, ts_test, order, H)
+        mse = mean_squared_error(ts_test[H:], y_hat)
+        print('ARIMA%s MSE=%.3f' % (order, mse))
+        return order, mse
+    except:
+        print('ARIMA%s MSE=%.3f' % (order, float("inf")))
+        return order, float("inf")
 
 
 def grid_search(ts_train, ts_test, H, p_grid, d_grid, q_grid):
@@ -45,19 +60,10 @@ def grid_search(ts_train, ts_test, H, p_grid, d_grid, q_grid):
     Grid search to find best ARIMA orders.
     """
     best_score, best_cfg = float("inf"), None
+    result = Parallel(n_jobs=-1)(
+        delayed(optimization_step)(p, d, q, ts_train, ts_test, H)
+        for p, d, q in product(p_grid, d_grid, q_grid))
 
-    for p in p_grid:
-        for d in d_grid:
-            for q in q_grid:
-                order = (p, d, q)
-                try:
-                    _, y_hat = fit_predict(ts_train, ts_test, order, H)
-                    mse = mean_squared_error(ts_test[H:], y_hat)
-                    if mse < best_score:
-                        best_score, best_cfg = mse, order
-                    print('ARIMA%s MSE=%.3f' % (order, mse))
-                except:
-                    continue
     print('Best ARIMA%s MSE=%.3f' % (best_cfg, best_score))
 
     return best_cfg
