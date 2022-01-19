@@ -7,6 +7,7 @@ Preprocessing utilities required to reproduce the results in the paper
 
 import pandas as pd
 from pandas import DataFrame
+import numpy as np
 
 
 def ts2super(ts: DataFrame, n_lags: int, h: int):
@@ -33,3 +34,14 @@ def ts2super(ts: DataFrame, n_lags: int, h: int):
     data_super = data_super_lags.join(data_super_future.iloc[:, 1:]).dropna()
     data_super = data_super.reset_index(drop=True)
     return data_super
+
+
+def split_datasets(data, idx_matrix):
+    return data[idx_matrix[0]], data[idx_matrix[1]], data[idx_matrix[2]]
+
+
+def compute_average_volatility(X, window_length):
+    X_new = np.convolve(X.ravel(), np.ones(window_length) / window_length,
+                        mode="valid").reshape(-1, 1)
+    X_new = np.concatenate((X[:window_length-1], X_new))
+    return X_new

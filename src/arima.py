@@ -29,12 +29,12 @@ def fit_predict(ts_train, ts_test, arima_order, H):
     train_pred = train_model_fit.predict().reshape(-1, 1)
 
     history = [x for x in ts_train]
-    predictions = list()
+    predictions = [None] * len(ts_test)
     for t in range(len(ts_test)):
         model = ARIMA(history, order=arima_order)
         model_fit = model.fit()
         yhat = model_fit.forecast(steps=H)[0]
-        predictions.append(yhat)
+        predictions[t] = yhat
         history.append(ts_test[t])
 
     test_pred = np.array(predictions[:-H]).reshape(-1, 1)
@@ -65,7 +65,9 @@ def grid_search(ts_train, ts_test, H, p_grid, d_grid, q_grid):
         for p, d, q in product(p_grid, d_grid, q_grid))
 
     print('Best ARIMA%s MSE=%.3f' % (best_cfg, best_score))
-
+    best_score = np.min(np.array(result)[:, 1])
+    best_idx = np.argmin(np.array(result)[:, 1])
+    best_cfg = result[best_idx][0]
     return best_cfg
 
 
