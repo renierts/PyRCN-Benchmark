@@ -135,12 +135,10 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 results['MSE test'].append(mse_test)
                 results['R2 train'].append(r2_train)
                 results['R2 test'].append(r2_test)
-
                 # Save list of dictionaries with results
-                export_results(
-                    results, f'./results/arima_grid_{experiment}_h{H}.csv')
                 LOGGER.info("    ... done!")
                 idx_matrix.rotate(1)
+            export_results(results, f'./results/arima_grid_{experiment}_h{H}.csv')
             LOGGER.info("... done!")
         if fit_mlp:
             results = {'R2 train': [], 'R2 test': [],
@@ -223,17 +221,17 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 LOGGER.info(f"    Fold {experiment}: ")
 
                 # Experiment indexes
-                trn, val, tst = split_datasets(data, idx_matrix)
-                trn = ts2super(trn, 0, H)
-                val = ts2super(val, 0, H)
-                tst = ts2super(tst, 0, H)
+                df_train, df_val, df_test = split_datasets(data, idx_matrix)
+                df_train = ts2super(df_train, 0, H)
+                df_val = ts2super(df_val, 0, H)
+                df_test = ts2super(df_test, 0, H)
                 LOGGER.info("        Feature Extraction:")
-                X_train = trn.iloc[:, 0].values.reshape(-1, 1)
-                y_train = trn.iloc[:, -1].values.reshape(-1, 1)
-                X_val = val.iloc[:, 0].values.reshape(-1, 1)
-                y_val = val.iloc[:, -1].values.reshape(-1, 1)
-                X_test = tst.iloc[:, 0].values.reshape(-1, 1)
-                y_test = tst.iloc[:, -1].values.reshape(-1, 1)
+                X_train = df_train.iloc[:, 0].values.reshape(-1, 1)
+                y_train = df_train.iloc[:, -1].values.reshape(-1, 1)
+                X_val = df_val.iloc[:, 0].values.reshape(-1, 1)
+                y_val = df_val.iloc[:, -1].values.reshape(-1, 1)
+                X_test = df_test.iloc[:, 0].values.reshape(-1, 1)
+                y_test = df_test.iloc[:, -1].values.reshape(-1, 1)
                 LOGGER.info("        MinMaxScaling:")
                 # Data scaling to [0, 1]
                 try:
@@ -354,8 +352,7 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 # Save list of dictionaries with results
                 LOGGER.info("    ... done!")
                 idx_matrix.rotate(1)
-            export_results(
-                results, f'./results/har_grid_h{H}.csv')
+            export_results(results, f'./results/har_grid_h{H}.csv')
             LOGGER.info("... done!")
 
 
