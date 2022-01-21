@@ -14,10 +14,13 @@ from src.preprocessing import (
     ts2super, split_datasets, compute_average_volatility)
 from src.file_handling import export_results
 from src.har import HAR
+from src.model_selection import PredefinedTrainValidationTestSplit
+import pandas as pd
+import itertools
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler, FunctionTransformer
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import FeatureUnion
+from sklearn.compose import TransformedTargetRegressor
+from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import GridSearchCV
 from joblib import dump, load
@@ -216,6 +219,17 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                        'MSE train': [], 'MSE test': []}
 
             # Run model selection
+            X = pd.concat(data).iloc[:, 0].values.reshape(-1, 1)
+            y = pd.concat(data).iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [[k] * len(data[k]) for k in range(len(data))]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+
+
+
+
             LOGGER.info(f"Starting the experiment with the horizon {H}...")
             for experiment in range(len(datasets)):
                 LOGGER.info(f"    Fold {experiment}: ")
@@ -282,10 +296,6 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 LOGGER.info("... done!")
             LOGGER.info("... done!")
         if fit_har:
-            results = {'R2 train': [], 'R2 test': [],
-                       'MSE train': [], 'MSE test': []}
-
-            # Run model selection
             week_volatility_transformer = FunctionTransformer(
                 func=compute_average_volatility, kw_args={"window_length": 5})
             month_volatility_transformer = FunctionTransformer(
@@ -293,66 +303,34 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             feature_transformer = FeatureUnion(
                 transformer_list=[("week", week_volatility_transformer),
                                   ("month", month_volatility_transformer)])
-            LOGGER.info(f"Starting the experiment with the horizon {H}...")
-            for experiment in range(len(datasets)):
-                LOGGER.info(f"    Fold {experiment}: ")
 
-                # Experiment indexes
-                df_train, df_val, df_test = split_datasets(data, idx_matrix)
-                df_train = ts2super(df_train, 0, H)
-                df_val = ts2super(df_val, 0, H)
-                df_test = ts2super(df_test, 0, H)
-                LOGGER.info("        Feature Extraction:")
-                x1 = df_train.iloc[:, 0].values.reshape(-1, 1)
-                x2 = feature_transformer.fit_transform(x1)
-                X_train = np.hstack((x1, x2))
-                y_train = df_train.iloc[:, -1].values.reshape(-1, 1)
-                x1 = df_val.iloc[:, 0].values.reshape(-1, 1)
-                x2 = feature_transformer.fit_transform(x1)
-                X_val = np.hstack((x1, x2))
-                y_val = df_val.iloc[:, -1].values.reshape(-1, 1)
-                x1 = df_test.iloc[:, 0].values.reshape(-1, 1)
-                x2 = feature_transformer.fit_transform(x1)
-                X_test = np.hstack((x1, x2))
-                y_test = df_test.iloc[:, -1].values.reshape(-1, 1)
-                # Joining train and validation for learning, since not tunable
-                X_dev = np.concatenate((X_train, X_val))
-                y_dev = np.concatenate((y_train, y_val))
-                LOGGER.info("        MinMaxScaling:")
-                # Data scaling to [0, 1]
-                try:
-                    x_scaler = load(f'./results/x_scaler_har_grid_'
-                                    f'{experiment}_h{H}.joblib')
-                except FileNotFoundError:
-                    x_scaler = MinMaxScaler().fit(X_dev)
-                    dump(x_scaler, f'./results/x_scaler_har_grid_'
-                                   f'{experiment}_h{H}.joblib')
-                try:
-                    y_scaler = load(f'./results/y_scaler_har_grid_'
-                                    f'{experiment}_h{H}.joblib')
-                except FileNotFoundError:
-                    y_scaler = MinMaxScaler().fit(y_train)
-                    dump(y_scaler, f'./results/y_scaler_har_grid_'
-                                   f'{experiment}_h{H}.joblib')
-                X_dev_scaled = x_scaler.transform(X_dev)
-                X_test_scaled = x_scaler.transform(X_test)
-                y_dev_scaled = y_scaler.transform(y_dev)
-                mdl = HAR().fit(X_dev_scaled, y_dev_scaled)
-                y_dev_pred_scaled = mdl.predict(X_dev_scaled)
-                y_test_pred_scaled = mdl.predict(X_test_scaled)
-                y_dev_pred = y_scaler.inverse_transform(y_dev_pred_scaled)
-                y_test_pred = y_scaler.inverse_transform(y_test_pred_scaled)
-                dump(mdl, f'./results/har_model_{experiment}_h{H}.joblib')
-                results['MSE train'].append(
-                    mean_squared_error(y_dev, y_dev_pred))
-                results['MSE test'].append(
-                    mean_squared_error(y_test, y_test_pred))
-                results['R2 train'].append(r2_score(y_dev, y_dev_pred))
-                results['R2 test'].append(r2_score(y_test, y_test_pred))
-                # Save list of dictionaries with results
-                LOGGER.info("    ... done!")
-                idx_matrix.rotate(1)
-            export_results(results, f'./results/har_grid_h{H}.csv')
+            har_pipeline = Pipeline(
+                steps=[("scaler", MinMaxScaler()),
+                       ("lstsq", TransformedTargetRegressor(
+                           transformer=MinMaxScaler()))])
+
+            # Prepare data
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            x1 = df.iloc[:, 0].values.reshape(-1, 1)
+            x2 = feature_transformer.fit_transform(x1)
+
+            X = np.hstack((x1, x2))
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [[k] * len(ts2super(d, 0, H))
+                         for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+
+            # Run model selection
+            LOGGER.info(f"Starting the experiment with the horizon {H}...")
+            search = GridSearchCV(
+                estimator=har_pipeline, param_grid={}, cv=ps,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search, f'./results/har_grid_h{H}.joblib')
             LOGGER.info("... done!")
 
 
