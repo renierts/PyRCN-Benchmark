@@ -42,6 +42,5 @@ def split_datasets(data, idx_matrix):
 
 def compute_average_volatility(X, window_length):
     X_new = np.convolve(X.ravel(), np.ones(window_length) / window_length,
-                        mode="valid").reshape(-1, 1)
-    X_new = np.concatenate((X[:window_length-1], X_new))
+                        mode="full").reshape(-1, 1)[:len(X)]
     return X_new

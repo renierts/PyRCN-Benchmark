@@ -946,7 +946,7 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
             }
             kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            'n_jobs': 1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
             """
             kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,

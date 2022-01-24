@@ -4,6 +4,7 @@ from src.pyESN.pyESN import identity
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import _deprecate_positional_args
 from reservoirpy.nodes import Reservoir, Ridge
+import numpy as np
 
 
 class PyESN(ESN, RegressorMixin):
@@ -22,6 +23,24 @@ class PyESN(ESN, RegressorMixin):
             teacher_shift=teacher_shift, out_activation=out_activation,
             inverse_out_activation=inverse_out_activation,
             random_state=random_state, silent=silent)
+
+    def get_params(self, deep=True):
+        """Get all parameters."""
+        return {
+            "input_scaling": self.input_scaling[0],
+            "input_shift": self.input_shift[0],
+            "n_inputs": self.n_inputs, "n_outputs": self.n_outputs,
+            "n_reservoir": self.n_reservoir, "noise": self.noise,
+            "random_state": self.random_state, "sparsity": self.sparsity,
+            "spectral_radius": self.spectral_radius,
+            "teacher_scaling": self.teacher_scaling,
+            "teacher_shift": self.teacher_shift}
+
+    def set_params(self, **parameters: dict):
+        for key in parameters.keys():
+            if key in self.get_params():
+                super().__setattr__(key, parameters[key])
+        return self
 
     def fit(self, X, y):
         pred_train = super(ESN).fit(inputs=X, outputs=y, inspect=False)
