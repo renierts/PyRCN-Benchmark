@@ -29,8 +29,10 @@ from collections import OrderedDict, deque
 from sklearn.utils.fixes import loguniform
 from scipy.stats import uniform
 
+from pyrcn.extreme_learning_machine import ELMRegressor
 from pyrcn.echo_state_network import ESNRegressor
 from pyrcn.model_selection import SequentialSearchCV
+from skelm import ELMRegressor as SkELMRegressor
 
 
 LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,8 @@ LOGGER = logging.getLogger(__name__)
 
 def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
          fit_pyrcn_esn: bool = False, fit_har_pyrcn_esn: bool = False,
+         fit_pyrcn_elm: bool = False, fit_har_pyrcn_elm: bool = False,
+         fit_skelm_elm: bool = False, fit_har_skelm_elm: bool = False,
          fit_pyesn_esn: bool = False, fit_har_pyesn_esn: bool = False,
          fit_reservoirpy_esn: bool = False,
          fit_har_reservoirpy_esn: bool = False) -> None:
@@ -59,14 +63,22 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
         Fit ESN models with PyRCN.
     fit_har_pyrcn_esn:
         Fit ESN models with PyRCN.
+    fit_pyrcn_elm:
+        Fit ESN models with PyRCN.
+    fit_har_pyrcn_elm:
+        Fit ESN models with PyRCN.
+    fit_skelm_elm:
+        Fit ESN models with scikit-ELM.
+    fit_har_skelm_elm:
+        Fit ESN models with scikit-ELM.
     fit_pyesn_esn:
         Fit ESN models with PyESN.
     fit_har_pyesn_esn:
         Fit ESN models with PyESN.
     fit_reservoirpy_esn:
-        Fit ESN models with PyESN.
+        Fit ESN models with ReservoirPy.
     fit_har_reservoirpy_esn:
-        Fit ESN models with PyESN.
+        Fit ESN models with ReservoirPy.
     """
     datasets = OrderedDict({"CAT": 0, "EBAY": 1, "MSFT": 2})
     data = [None] * len(datasets)
@@ -307,7 +319,10 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
             step3_params = {
                 'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
-            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            step4_params = {
+                'esn__regressor__hidden_layer_size':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'esn__regressor__alpha': loguniform(1e-5, 1e1)}
             scoring = {
                 "MSE": "neg_mean_squared_error",
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
@@ -321,7 +336,7 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
-            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+            kwargs_step4 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
 
@@ -332,20 +347,19 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
             search = SequentialSearchCV(
                 esn_pipeline, searches=searches).fit(X, y)
-            dump(search, f'./results/pyrcn_seq_h{H}.joblib')
+            dump(search, f'./results/pyrcn_seq_esn_h{H}.joblib')
 
-            ps_final = PredefinedTrainValidationTestSplit(
+            ps_test = PredefinedTrainValidationTestSplit(
                 test_fold=test_fold, validation=False)
             LOGGER.info("    ... done!")
             LOGGER.info("    Final evaluation...")
-            search_final = GridSearchCV(
+            search_test = GridSearchCV(
                 estimator=clone(search.best_estimator_),
-                param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                param_grid={}, cv=ps_test,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
-            dump(search_final, f'./results/pyrcn_seq_h{H}_final.joblib')
+            dump(search_test, f'./results/pyrcn_seq_esn_h{H}_test.joblib')
             LOGGER.info("    ... done!")
         if fit_har_pyrcn_esn:
             LOGGER.info(f"Starting the HAR-ESN experiment with the horizon "
@@ -397,7 +411,10 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
             step3_params = {
                 'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
-            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            step4_params = {
+                'esn__regressor__hidden_layer_size':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'esn__regressor__alpha': loguniform(1e-5, 1e1)}
             scoring = {
                 "MSE": "neg_mean_squared_error",
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
@@ -411,7 +428,7 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
-            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+            kwargs_step4 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
 
@@ -422,20 +439,303 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
             search = SequentialSearchCV(
                 esn_pipeline, searches=searches).fit(X, y)
-            dump(search, f'./results/pyrcn_har_seq_h{H}.joblib')
+            dump(search, f'./results/pyrcn_har_seq_esn_h{H}.joblib')
 
-            ps_final = PredefinedTrainValidationTestSplit(
+            ps_test = PredefinedTrainValidationTestSplit(
                 test_fold=test_fold, validation=False)
             LOGGER.info("    ... done!")
             LOGGER.info("    Final evaluation...")
-            search_final = GridSearchCV(
+            search_test = GridSearchCV(
                 estimator=clone(search.best_estimator_),
-                param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                param_grid={}, cv=ps_test,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
-            dump(search_final, f'./results/pyrcn_har_seq_h{H}_final.joblib')
+            dump(search_test, f'./results/pyrcn_har_seq_esn_h{H}_test.joblib')
+            LOGGER.info("    ... done!")
+        if fit_pyrcn_elm:
+            LOGGER.info(f"Starting the ELM experiment with the horizon {H}...")
+            LOGGER.info(f"    Creating feature extraction and ELM pipeline...")
+            initial_elm_params = {
+                'hidden_layer_size': 50, 'k_in': 1, 'input_scaling': 0.4,
+                'input_activation': 'tanh', 'bias_scaling': 0.0, 'alpha': 1e-5,
+                'random_state': 42}
+            elm_pipeline = Pipeline(
+                steps=[("scaler", MinMaxScaler()),
+                       ("elm", TransformedTargetRegressor(
+                           regressor=ELMRegressor(**initial_elm_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'elm__regressor__input_scaling': uniform(loc=1e-2, scale=1)}
+            step2_params = {
+                'elm__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step3_params = {
+                'elm__regressor__hidden_layer_size':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'elm__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3)]
+            search = SequentialSearchCV(
+                elm_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyrcn_seq_elm_h{H}.joblib')
+
+            ps_test = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_test = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={}, cv=ps_test,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_test, f'./results/pyrcn_seq_elm_h{H}_test.joblib')
+            LOGGER.info("    ... done!")
+        if fit_har_pyrcn_elm:
+            LOGGER.info(f"Starting the HAR-ELM experiment with the horizon "
+                        f"{H}...")
+            LOGGER.info(f"    Creating HAR and ELM pipeline...")
+            day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
+            week_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 5})
+            month_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 22})
+            har_features = FeatureUnion(
+                transformer_list=[("day", day_volatility_transformer),
+                                  ("week", week_volatility_transformer),
+                                  ("month", month_volatility_transformer)])
+
+            initial_elm_params = {
+                'hidden_layer_size': 50, 'k_in': 2, 'input_scaling': 0.4,
+                'input_activation': 'tanh', 'bias_scaling': 0.0, 'alpha': 1e-5,
+                'random_state': 42}
+            elm_pipeline = Pipeline(
+                steps=[("har_features", har_features),
+                       ("scaler", MinMaxScaler()),
+                       ("elm", TransformedTargetRegressor(
+                           regressor=ELMRegressor(**initial_elm_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'elm__regressor__input_scaling': uniform(loc=1e-2, scale=1)}
+            step2_params = {
+                'elm__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step3_params = {
+                'elm__regressor__hidden_layer_size':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'elm__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3)]
+            search = SequentialSearchCV(
+                elm_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyrcn_har_seq_elm_h{H}.joblib')
+
+            ps_test = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_test = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={}, cv=ps_test,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_test, f'./results/pyrcn_har_seq_elm_h{H}_test.joblib')
+            LOGGER.info("    ... done!")
+        if fit_skelm_elm:
+            LOGGER.info(f"Starting the ELM experiment with the horizon {H}...")
+            LOGGER.info(f"    Creating feature extraction and ELM pipeline...")
+            initial_elm_params = {
+                'n_neurons': 50, 'density': 0.1, 'ufunc': 'tanh',
+                'alpha': 1e-5, 'random_state': 42}
+            elm_pipeline = Pipeline(
+                steps=[("scaler", MinMaxScaler()),
+                       ("elm", TransformedTargetRegressor(
+                           regressor=SkELMRegressor(**initial_elm_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'elm__regressor__n_neurons':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'elm__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1)]
+            search = SequentialSearchCV(
+                elm_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/skelm_seq_elm_h{H}.joblib')
+
+            ps_test = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_test = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={}, cv=ps_test,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_test, f'./results/skelm_seq_elm_h{H}_test.joblib')
+            LOGGER.info("    ... done!")
+        if fit_har_skelm_elm:
+            LOGGER.info(f"Starting the HAR-ELM experiment with the horizon "
+                        f"{H}...")
+            LOGGER.info(f"    Creating HAR and ELM pipeline...")
+            day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
+            week_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 5})
+            month_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 22})
+            har_features = FeatureUnion(
+                transformer_list=[("day", day_volatility_transformer),
+                                  ("week", week_volatility_transformer),
+                                  ("month", month_volatility_transformer)])
+
+            initial_elm_params = {
+                'n_neurons': 50, 'density': 0.1, 'ufunc': 'tanh',
+                'alpha': 1e-5, 'random_state': 42}
+            elm_pipeline = Pipeline(
+                steps=[("har_features", har_features),
+                       ("scaler", MinMaxScaler()),
+                       ("elm", TransformedTargetRegressor(
+                           regressor=SkELMRegressor(**initial_elm_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'elm__regressor__n_neurons':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'elm__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1)]
+            search = SequentialSearchCV(
+                elm_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/skelm_har_seq_elm_h{H}.joblib')
+
+            ps_test = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_test = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={}, cv=ps_test,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_test, f'./results/skelm_har_seq_elm_h{H}_test.joblib')
             LOGGER.info("    ... done!")
         if fit_reservoirpy_esn:
             LOGGER.info(f"Starting the ESN experiment with the horizon {H}...")
@@ -782,6 +1082,10 @@ if __name__ == "__main__":
     parser.add_argument("--fit_har", action="store_true")
     parser.add_argument("--fit_pyrcn_esn", action="store_true")
     parser.add_argument("--fit_har_pyrcn_esn", action="store_true")
+    parser.add_argument("--fit_pyrcn_elm", action="store_true")
+    parser.add_argument("--fit_har_pyrcn_elm", action="store_true")
+    parser.add_argument("--fit_skelm_elm", action="store_true")
+    parser.add_argument("--fit_har_skelm_elm", action="store_true")
     parser.add_argument("--fit_reservoirpy_esn", action="store_true")
     parser.add_argument("--fit_har_reservoirpy_esn", action="store_true")
     parser.add_argument("--fit_pyesn_esn", action="store_true")

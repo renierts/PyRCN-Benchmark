@@ -9,3 +9,6 @@ seaborn
 reservoirpy
 hpelm
 jupyterlab
+scikit-elm
+distributed
+git+https://github.com/masaponto/python-elm
