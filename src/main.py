@@ -13,26 +13,34 @@ import src.arima as arima
 from src.preprocessing import (
     ts2super, split_datasets, compute_average_volatility)
 from src.file_handling import export_results
-from src.har import HAR
 from src.model_selection import PredefinedTrainValidationTestSplit
+from src.adapter import PyESN, ReservoirPyESN
 import pandas as pd
 import itertools
+from sklearn.base import clone
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler, FunctionTransformer
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.neural_network import MLPRegressor
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from joblib import dump, load
 from collections import OrderedDict, deque
+from sklearn.utils.fixes import loguniform
+from scipy.stats import uniform
+
+from pyrcn.echo_state_network import ESNRegressor
+from pyrcn.model_selection import SequentialSearchCV
 
 
 LOGGER = logging.getLogger(__name__)
 
 
 def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
-         fit_grid_esn: bool = False, fit_pso_esn: bool = False,
-         fit_har_pso_esn: bool = False) -> None:
+         fit_pyrcn_esn: bool = False, fit_har_pyrcn_esn: bool = False,
+         fit_pyesn_esn: bool = False, fit_har_pyesn_esn: bool = False,
+         fit_reservoirpy_esn: bool = False,
+         fit_har_reservoirpy_esn: bool = False) -> None:
     """
     This is the main function to reproduce all visualizations and models for
     the paper "Template Repository for Research Papers with Python Code".
@@ -47,12 +55,18 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
         Fit MLP models.
     fit_har: default=False
         Fit the HAR model.
-    fit_grid_esn:
-        Fit ESN models.
-    fit_pso_esn:
-        Fit ESN models.
-    fit_har_pso_esn:
-        Fit ESN models.
+    fit_pyrcn_esn:
+        Fit ESN models with PyRCN.
+    fit_har_pyrcn_esn:
+        Fit ESN models with PyRCN.
+    fit_pyesn_esn:
+        Fit ESN models with PyESN.
+    fit_har_pyesn_esn:
+        Fit ESN models with PyESN.
+    fit_reservoirpy_esn:
+        Fit ESN models with PyESN.
+    fit_har_reservoirpy_esn:
+        Fit ESN models with PyESN.
     """
     datasets = OrderedDict({"CAT": 0, "EBAY": 1, "MSFT": 2})
     data = [None] * len(datasets)
@@ -214,124 +228,550 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 LOGGER.info("    ... done!")
             idx_matrix.rotate(1)
             LOGGER.info("... done!")
-        if fit_grid_esn:
-            results = {'R2 train': [], 'R2 test': [],
-                       'MSE train': [], 'MSE test': []}
-
-            # Run model selection
-            X = pd.concat(data).iloc[:, 0].values.reshape(-1, 1)
-            y = pd.concat(data).iloc[:, -1].values.reshape(-1, 1)
-            test_fold = [[k] * len(data[k]) for k in range(len(data))]
-            test_fold = list(itertools.chain.from_iterable(test_fold))
-
-            ps = PredefinedTrainValidationTestSplit(
-                test_fold=test_fold, validation=True)
-
-
-
-
-            LOGGER.info(f"Starting the experiment with the horizon {H}...")
-            for experiment in range(len(datasets)):
-                LOGGER.info(f"    Fold {experiment}: ")
-
-                # Experiment indexes
-                df_train, df_val, df_test = split_datasets(data, idx_matrix)
-                df_train = ts2super(df_train, 0, H)
-                df_val = ts2super(df_val, 0, H)
-                df_test = ts2super(df_test, 0, H)
-                LOGGER.info("        Feature Extraction:")
-                X_train = df_train.iloc[:, 0].values.reshape(-1, 1)
-                y_train = df_train.iloc[:, -1].values.reshape(-1, 1)
-                X_val = df_val.iloc[:, 0].values.reshape(-1, 1)
-                y_val = df_val.iloc[:, -1].values.reshape(-1, 1)
-                X_test = df_test.iloc[:, 0].values.reshape(-1, 1)
-                y_test = df_test.iloc[:, -1].values.reshape(-1, 1)
-                LOGGER.info("        MinMaxScaling:")
-                # Data scaling to [0, 1]
-                try:
-                    x_scaler = load(f'./results/x_scaler_esn_grid_'
-                                    f'{experiment}_h{H}.joblib')
-                except FileNotFoundError:
-                    x_scaler = MinMaxScaler().fit(X_train)
-                    dump(x_scaler, f'./results/x_scaler_esn_grid_'
-                                   f'{experiment}_h{H}.joblib')
-                try:
-                    y_scaler = load(f'./results/y_scaler_esn_grid_'
-                                    f'{experiment}_h{H}.joblib')
-                except FileNotFoundError:
-                    y_scaler = MinMaxScaler().fit(y_train)
-                    dump(y_scaler, f'./results/y_scaler_esn_grid_'
-                                   f'{experiment}_h{H}.joblib')
-                X_train_scaled = x_scaler.transform(X_train)
-                X_val_scaled = x_scaler.transform(X_val)
-                X_test_scaled = x_scaler.transform(X_test)
-                y_train_scaled = y_scaler.transform(y_train)
-                y_val_scaled = y_scaler.transform(y_val)
-                LOGGER.info("        ... done!")
-                # Finding ARIMA orders through grid search
-                LOGGER.info("        GridSearch:")
-                mdl = mlp_gs.objct(grid_points=5, seed=1985)
-                mdl.fit(X_train_scld, Y_train_scld, X_val_scld, Y_val_scld)
-                LOGGER.info("        ... done!")
-                LOGGER.info("        Prediction:")
-                Y_train_pred_scld = mdl.predict(X_train_scld)
-                Y_test_pred_scld = mdl.predict(X_test_scld)
-                # Unscale prediction
-                Y_train_pred = Y_train_pred_scld * ydelta + np.min(Y_train,
-                                                                   axis=0)
-                Y_test_pred = Y_test_pred_scld * ydelta + np.min(Y_train,
-                                                                 axis=0)
-                # Measuring accuracy
-                results['MSE train'].append(
-                    mean_squared_error(Y_train, Y_train_pred))
-                results['MSE test'].append(
-                    mean_squared_error(Y_test, Y_test_pred))
-                results['R2 train'].append(r2_score(Y_train, Y_train_pred))
-                results['R2 test'].append(r2_score(Y_test, Y_test_pred))
-
-                # Save list of dictionaries with results
-                dump(results, f'./results/mlpgrid_{datasets[experiment]}'
-                              f'_h{H}.joblib')
-                idx_matrix.rotate(1)
-                LOGGER.info("... done!")
-            LOGGER.info("... done!")
         if fit_har:
+            LOGGER.info(f"Starting the HAR experiment with the horizon {H}...")
+            LOGGER.info(f"    Creating feature extraction and HAR pipeline...")
+            day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
             week_volatility_transformer = FunctionTransformer(
                 func=compute_average_volatility, kw_args={"window_length": 5})
             month_volatility_transformer = FunctionTransformer(
                 func=compute_average_volatility, kw_args={"window_length": 22})
-            feature_transformer = FeatureUnion(
-                transformer_list=[("week", week_volatility_transformer),
+            har_features = FeatureUnion(
+                transformer_list=[("day", day_volatility_transformer),
+                                  ("week", week_volatility_transformer),
                                   ("month", month_volatility_transformer)])
-
             har_pipeline = Pipeline(
-                steps=[("scaler", MinMaxScaler()),
+                steps=[("har_features", har_features),
+                       ("scaler", MinMaxScaler()),
                        ("lstsq", TransformedTargetRegressor(
                            transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
 
             # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
             df = pd.concat([ts2super(d, 0, H) for d in data])
-            x1 = df.iloc[:, 0].values.reshape(-1, 1)
-            x2 = feature_transformer.fit_transform(x1)
-
-            X = np.hstack((x1, x2))
+            X = df.iloc[:, 0].values.reshape(-1, 1)
             y = df.iloc[:, -1].values.reshape(-1, 1)
-            test_fold = [[k] * len(ts2super(d, 0, H))
-                         for k, d in enumerate(data)]
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
             test_fold = list(itertools.chain.from_iterable(test_fold))
 
             ps = PredefinedTrainValidationTestSplit(
                 test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
 
             # Run model selection
-            LOGGER.info(f"Starting the experiment with the horizon {H}...")
+            LOGGER.info(f"    Performing the grid search...")
             search = GridSearchCV(
                 estimator=har_pipeline, param_grid={}, cv=ps,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search, f'./results/har_grid_h{H}.joblib')
-            LOGGER.info("... done!")
+            LOGGER.info("    ... done!")
+        if fit_pyrcn_esn:
+            LOGGER.info(f"Starting the ESN experiment with the horizon {H}...")
+            LOGGER.info(f"    Creating feature extraction and ESN pipeline...")
+            initial_esn_params = {
+                'hidden_layer_size': 50, 'k_in': 1, 'input_scaling': 0.4,
+                'input_activation': 'identity', 'bias_scaling': 0.0,
+                'spectral_radius': 0.0, 'leakage': 1.0, 'k_rec': 10,
+                'reservoir_activation': 'tanh', 'bidirectional': False,
+                'alpha': 1e-5, 'random_state': 42}
+            esn_pipeline = Pipeline(
+                steps=[("scaler", MinMaxScaler()),
+                       ("esn", TransformedTargetRegressor(
+                           regressor=ESNRegressor(**initial_esn_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
+                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
+            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
+            step3_params = {
+                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
+                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+            search = SequentialSearchCV(
+                esn_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyrcn_seq_h{H}.joblib')
+
+            ps_final = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_final = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={"esn__regressor__hidden_layer_size": [
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_final, f'./results/pyrcn_seq_h{H}_final.joblib')
+            LOGGER.info("    ... done!")
+        if fit_har_pyrcn_esn:
+            LOGGER.info(f"Starting the HAR-ESN experiment with the horizon "
+                        f"{H}...")
+            LOGGER.info(f"    Creating HAR and ESN pipeline...")
+            day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
+            week_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 5})
+            month_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 22})
+            har_features = FeatureUnion(
+                transformer_list=[("day", day_volatility_transformer),
+                                  ("week", week_volatility_transformer),
+                                  ("month", month_volatility_transformer)])
+
+            initial_esn_params = {
+                'hidden_layer_size': 50, 'k_in': 2, 'input_scaling': 0.4,
+                'input_activation': 'identity', 'bias_scaling': 0.0,
+                'spectral_radius': 0.0, 'leakage': 1.0, 'k_rec': 10,
+                'reservoir_activation': 'tanh', 'bidirectional': False,
+                'alpha': 1e-5, 'random_state': 42}
+            esn_pipeline = Pipeline(
+                steps=[("har_features", har_features),
+                       ("scaler", MinMaxScaler()),
+                       ("esn", TransformedTargetRegressor(
+                           regressor=ESNRegressor(**initial_esn_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
+                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
+            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
+            step3_params = {
+                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
+                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+            search = SequentialSearchCV(
+                esn_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyrcn_har_seq_h{H}.joblib')
+
+            ps_final = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_final = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={"esn__regressor__hidden_layer_size": [
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_final, f'./results/pyrcn_har_seq_h{H}_final.joblib')
+            LOGGER.info("    ... done!")
+        if fit_reservoirpy_esn:
+            LOGGER.info(f"Starting the ESN experiment with the horizon {H}...")
+            LOGGER.info(f"    Creating feature extraction and ESN pipeline...")
+            initial_esn_params = {
+                'units': 50, 'lr': 1.0, 'sr': 0.0, 'noise_rc': 1e-5,
+                'input_scaling': 0.4, 'fb_scaling': 1.0,
+                'input_connectivity': 0.1, 'rc_connectivity': 0.1,
+                'seed': 42, 'ridge': 1e-5}
+            esn_pipeline = Pipeline(
+                steps=[("scaler", MinMaxScaler()),
+                       ("esn", TransformedTargetRegressor(
+                           regressor=ReservoirPyESN(**initial_esn_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
+                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
+            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
+            step3_params = {
+                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step4_params = {'esn__regressor__ridge': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': 1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
+                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+            search = SequentialSearchCV(
+                esn_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyrcn_seq_h{H}.joblib')
+
+            ps_final = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_final = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={"esn__regressor__hidden_layer_size": [
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_final, f'./results/pyrcn_seq_h{H}_final.joblib')
+            LOGGER.info("    ... done!")
+        if fit_har_reservoirpy_esn:
+            LOGGER.info(f"Starting the HAR-ESN experiment with the horizon "
+                        f"{H}...")
+            LOGGER.info(f"    Creating HAR and ESN pipeline...")
+            day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
+            week_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 5})
+            month_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 22})
+            har_features = FeatureUnion(
+                transformer_list=[("day", day_volatility_transformer),
+                                  ("week", week_volatility_transformer),
+                                  ("month", month_volatility_transformer)])
+
+            initial_esn_params = {
+                'hidden_layer_size': 50, 'k_in': 2, 'input_scaling': 0.4,
+                'input_activation': 'identity', 'bias_scaling': 0.0,
+                'spectral_radius': 0.0, 'leakage': 1.0, 'k_rec': 10,
+                'reservoir_activation': 'tanh', 'bidirectional': False,
+                'alpha': 1e-5, 'random_state': 42}
+            esn_pipeline = Pipeline(
+                steps=[("har_features", har_features),
+                       ("scaler", MinMaxScaler()),
+                       ("esn", TransformedTargetRegressor(
+                           regressor=ESNRegressor(**initial_esn_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
+                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
+            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
+            step3_params = {
+                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
+                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+            search = SequentialSearchCV(
+                esn_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyrcn_har_seq_h{H}.joblib')
+
+            ps_final = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_final = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={"esn__regressor__hidden_layer_size": [
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_final, f'./results/pyrcn_har_seq_h{H}_final.joblib')
+            LOGGER.info("    ... done!")
+        if fit_pyesn_esn:
+            LOGGER.info(f"Starting the ESN experiment with the horizon {H}...")
+            LOGGER.info(f"    Creating feature extraction and ESN pipeline...")
+            initial_esn_params = {
+                'n_inputs': 1, 'n_outputs': 1, 'n_reservoir': 50,
+                'spectral_radius': 0.0, 'sparsity': 0.5, 'noise': 1e-3,
+                'input_shift': 0, 'input_scaling': 0.4,
+                'teacher_forcing': True, 'teacher_scaling': 1.,
+                'teacher_shift': 0, 'random_state': 42}
+            esn_pipeline = Pipeline(
+                steps=[("scaler", MinMaxScaler()),
+                       ("esn", TransformedTargetRegressor(
+                           regressor=PyESN(**initial_esn_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
+                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
+            # step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
+            # step3_params = {
+            #     'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step4_params = {'esn__regressor__noise': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            """
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            """
+            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                # ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                # ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
+                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+            search = SequentialSearchCV(
+                esn_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyesn_seq_h{H}.joblib')
+
+            ps_final = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_final = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={"esn__regressor__hidden_layer_size": [
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_final, f'./results/pyesn_seq_h{H}_final.joblib')
+            LOGGER.info("    ... done!")
+        if fit_har_pyesn_esn:
+            LOGGER.info(f"Starting the HAR-ESN experiment with the horizon "
+                        f"{H}...")
+            LOGGER.info(f"    Creating HAR and ESN pipeline...")
+            day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
+            week_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 5})
+            month_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 22})
+            har_features = FeatureUnion(
+                transformer_list=[("day", day_volatility_transformer),
+                                  ("week", week_volatility_transformer),
+                                  ("month", month_volatility_transformer)])
+
+            initial_esn_params = {
+                'n_inputs': 3, 'k_in': 2, 'input_scaling': 0.4,
+                'input_activation': 'identity', 'bias_scaling': 0.0,
+                'spectral_radius': 0.0, 'leakage': 1.0, 'k_rec': 10,
+                'reservoir_activation': 'tanh', 'bidirectional': False,
+                'alpha': 1e-5, 'random_state': 42}
+            esn_pipeline = Pipeline(
+                steps=[("har_features", har_features),
+                       ("scaler", MinMaxScaler()),
+                       ("esn", TransformedTargetRegressor(
+                           regressor=PyESN(**initial_esn_params),
+                           transformer=MinMaxScaler()))])
+            LOGGER.info("    ... done!")
+
+            # Prepare data
+            LOGGER.info(f"    Preparing the dataset...")
+            df = pd.concat([ts2super(d, 0, H) for d in data])
+            X = df.iloc[:, 0].values.reshape(-1, 1)
+            y = df.iloc[:, -1].values.reshape(-1, 1)
+            test_fold = [
+                [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+            test_fold = list(itertools.chain.from_iterable(test_fold))
+
+            ps = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=True)
+            LOGGER.info("    ... done!")
+
+            # Run model selection
+            LOGGER.info(f"    Performing the grid search...")
+            step1_params = {
+                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
+                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
+            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
+            step3_params = {
+                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
+            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            scoring = {
+                "MSE": "neg_mean_squared_error",
+                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
+            }
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
+                            "cv": ps, "return_train_score": True}
+
+            searches = [
+                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
+                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
+                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+            search = SequentialSearchCV(
+                esn_pipeline, searches=searches).fit(X, y)
+            dump(search, f'./results/pyesn_har_seq_h{H}.joblib')
+
+            ps_final = PredefinedTrainValidationTestSplit(
+                test_fold=test_fold, validation=False)
+            LOGGER.info("    ... done!")
+            LOGGER.info("    Final evaluation...")
+            search_final = GridSearchCV(
+                estimator=clone(search.best_estimator_),
+                param_grid={"esn__regressor__hidden_layer_size": [
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                scoring={"MSE": "neg_mean_squared_error",
+                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+                refit="R2", return_train_score=True).fit(X, y)
+            dump(search_final, f'./results/pyesn_har_seq_h{H}_final.joblib')
+            LOGGER.info("    ... done!")
 
 
 if __name__ == "__main__":
@@ -340,9 +780,12 @@ if __name__ == "__main__":
     parser.add_argument("--fit_arima", action="store_true")
     parser.add_argument("--fit_mlp", action="store_true")
     parser.add_argument("--fit_har", action="store_true")
-    parser.add_argument("--fit_grid_esn", action="store_true")
-    parser.add_argument("--fit_pso_esn", action="store_true")
-    parser.add_argument("--fit_har_pso_esn", action="store_true")
+    parser.add_argument("--fit_pyrcn_esn", action="store_true")
+    parser.add_argument("--fit_har_pyrcn_esn", action="store_true")
+    parser.add_argument("--fit_reservoirpy_esn", action="store_true")
+    parser.add_argument("--fit_har_reservoirpy_esn", action="store_true")
+    parser.add_argument("--fit_pyesn_esn", action="store_true")
+    parser.add_argument("--fit_har_pyesn_esn", action="store_true")
     args = vars(parser.parse_args())
     logging.basicConfig(format="%(asctime)s - [%(levelname)8s]: %(message)s",
                         handlers=[
