@@ -779,7 +779,7 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
             }
             kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': 1, 'scoring': scoring, "refit": "R2",
+                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
             kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
@@ -937,50 +937,39 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             step1_params = {
                 'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
                 'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
-            # step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
-            # step3_params = {
-            #     'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
-            step4_params = {'esn__regressor__noise': loguniform(1e-5, 1e1)}
+            step2_params = {
+                'esn__regressor__n_reservoir':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'esn__regressor__noise': loguniform(1e-5, 1e1)}
             scoring = {
                 "MSE": "neg_mean_squared_error",
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
             }
-            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': 1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            """
-            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 10,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
-            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            """
-            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+            kwargs_step2 = {'n_iter': 200, 'random_state': 42, 'verbose': 10,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
 
             searches = [
                 ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
-                # ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
-                # ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
-                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2)]
             search = SequentialSearchCV(
                 esn_pipeline, searches=searches).fit(X, y)
-            dump(search, f'./results/pyesn_seq_h{H}.joblib')
+            dump(search, f'./results/pyesn_seq_esn_h{H}.joblib')
 
-            ps_final = PredefinedTrainValidationTestSplit(
+            ps_test = PredefinedTrainValidationTestSplit(
                 test_fold=test_fold, validation=False)
             LOGGER.info("    ... done!")
             LOGGER.info("    Final evaluation...")
-            search_final = GridSearchCV(
+            search_test = GridSearchCV(
                 estimator=clone(search.best_estimator_),
-                param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                param_grid={}, cv=ps_test,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
-            dump(search_final, f'./results/pyesn_seq_h{H}_final.joblib')
+            dump(search_test, f'./results/pyesn_seq_esn_h{H}_test.joblib')
             LOGGER.info("    ... done!")
         if fit_har_pyesn_esn:
             LOGGER.info(f"Starting the HAR-ESN experiment with the horizon "
@@ -998,11 +987,11 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
                                   ("month", month_volatility_transformer)])
 
             initial_esn_params = {
-                'n_inputs': 3, 'k_in': 2, 'input_scaling': 0.4,
-                'input_activation': 'identity', 'bias_scaling': 0.0,
-                'spectral_radius': 0.0, 'leakage': 1.0, 'k_rec': 10,
-                'reservoir_activation': 'tanh', 'bidirectional': False,
-                'alpha': 1e-5, 'random_state': 42}
+                'n_inputs': 3, 'n_outputs': 1, 'n_reservoir': 50,
+                'spectral_radius': 0.0, 'sparsity': 0.5, 'noise': 1e-3,
+                'input_shift': 0, 'input_scaling': 0.4,
+                'teacher_forcing': True, 'teacher_scaling': 1.,
+                'teacher_shift': 0, 'random_state': 42}
             esn_pipeline = Pipeline(
                 steps=[("har_features", har_features),
                        ("scaler", MinMaxScaler()),
@@ -1029,48 +1018,39 @@ def main(fit_arima: bool = False, fit_mlp: bool = False, fit_har: bool = False,
             step1_params = {
                 'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
                 'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
-            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
-            step3_params = {
-                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
-            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
+            step2_params = {
+                'esn__regressor__n_reservoir':
+                    [50, 100, 200, 400, 800, 1600, 3200, 6400],
+                'esn__regressor__noise': loguniform(1e-5, 1e1)}
             scoring = {
                 "MSE": "neg_mean_squared_error",
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
             }
-            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 10,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
-            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
+            kwargs_step2 = {'n_iter': 200, 'random_state': 42, 'verbose': 10,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
 
             searches = [
                 ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
-                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
-                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
-                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
+                ('step2', RandomizedSearchCV, step2_params, kwargs_step2)]
             search = SequentialSearchCV(
                 esn_pipeline, searches=searches).fit(X, y)
-            dump(search, f'./results/pyesn_har_seq_h{H}.joblib')
+            dump(search, f'./results/pyesn_seq_esn_h{H}.joblib')
 
-            ps_final = PredefinedTrainValidationTestSplit(
+            ps_test = PredefinedTrainValidationTestSplit(
                 test_fold=test_fold, validation=False)
             LOGGER.info("    ... done!")
             LOGGER.info("    Final evaluation...")
-            search_final = GridSearchCV(
+            search_test = GridSearchCV(
                 estimator=clone(search.best_estimator_),
-                param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                param_grid={}, cv=ps_test,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
-            dump(search_final, f'./results/pyesn_har_seq_h{H}_final.joblib')
+            dump(search_test, f'./results/pyesn_har_seq_esn_h{H}_test.joblib')
             LOGGER.info("    ... done!")
 
 

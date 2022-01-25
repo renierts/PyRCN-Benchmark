@@ -7,7 +7,7 @@ from reservoirpy.nodes import Reservoir, Ridge
 import numpy as np
 
 
-class PyESN(ESN, RegressorMixin):
+class PyESN(BaseEstimator, RegressorMixin):
 
     def __init__(self, n_inputs, n_outputs, n_reservoir=200,
                  spectral_radius=0.95, sparsity=0, noise=0.001,
@@ -15,39 +15,55 @@ class PyESN(ESN, RegressorMixin):
                  teacher_scaling=None, teacher_shift=None,
                  out_activation=identity, inverse_out_activation=identity,
                  random_state=None, silent=True):
-        super().__init__(
+        self.input_shift = input_shift
+        self.input_scaling = input_scaling
+        self._model = ESN(
             n_inputs=n_inputs, n_outputs=n_outputs, n_reservoir=n_reservoir,
             spectral_radius=spectral_radius, sparsity=sparsity, noise=noise,
-            input_shift=input_shift, input_scaling=input_scaling,
+            input_shift=self.input_shift, input_scaling=self.input_scaling,
             teacher_forcing=teacher_forcing, teacher_scaling=teacher_scaling,
             teacher_shift=teacher_shift, out_activation=out_activation,
             inverse_out_activation=inverse_out_activation,
             random_state=random_state, silent=silent)
 
     def get_params(self, deep=True):
-        """Get all parameters."""
-        return {
-            "input_scaling": self.input_scaling[0],
-            "input_shift": self.input_shift[0],
-            "n_inputs": self.n_inputs, "n_outputs": self.n_outputs,
-            "n_reservoir": self.n_reservoir, "noise": self.noise,
-            "random_state": self.random_state, "sparsity": self.sparsity,
-            "spectral_radius": self.spectral_radius,
-            "teacher_scaling": self.teacher_scaling,
-            "teacher_shift": self.teacher_shift}
+        if self.input_scaling != np.unique(self._model.input_scaling):
+            raise ValueError("Input scaling different")
+        if self.input_shift != self._model.input_shift:
+            raise ValueError("Input shift different")
+        return {"input_scaling": self.input_scaling,
+                "input_shift": self.input_shift,
+                "n_inputs": self._model.n_inputs,
+                "n_outputs": self._model.n_outputs,
+                "n_reservoir": self._model.n_reservoir,
+                "spectral_radius": self._model.spectral_radius,
+                "sparsity": self._model.sparsity, "noise": self._model.noise,
+                "teacher_forcing": self._model.teacher_forcing,
+                "teacher_scaling": self._model.teacher_scaling,
+                "teacher_shift": self._model.teacher_shift,
+                "out_activation": self._model.out_activation,
+                "inverse_out_activation": self._model.inverse_out_activation,
+                "random_state": self._model.random_state,
+                "silent": self._model.silent}
 
-    def set_params(self, **parameters: dict):
-        for key in parameters.keys():
-            if key in self.get_params():
-                super().__setattr__(key, parameters[key])
+    def set_params(self, **params):
+        if "input_scaling" in params.keys():
+            self.input_scaling = params.pop("input_scaling")
+            self._model.__setattr__("input_scaling", self.input_scaling)
+        if "input_shift" in params.keys():
+            self.input_shift = params.pop("input_shift")
+            self._model.__setattr__("input_shift", self.input_shift)
+        for key, value in params.items():
+            self._model.__setattr__(key, value)
         return self
 
     def fit(self, X, y):
-        pred_train = super(ESN).fit(inputs=X, outputs=y, inspect=False)
+        pred_train = self._model.fit(inputs=X, outputs=y, inspect=False)
         return self
 
     def predict(self, X, continuation=True):
-        return super(ESN).predict(inputs=X, continuation=continuation)
+        y_pred = self._model.predict(inputs=X, continuation=continuation)
+        return y_pred
 
 
 class ReservoirPyESN(BaseEstimator, RegressorMixin):
