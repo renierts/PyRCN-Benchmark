@@ -29,7 +29,7 @@ class PyESN(BaseEstimator, RegressorMixin):
     def get_params(self, deep=True):
         if self.input_scaling != np.unique(self._model.input_scaling):
             raise ValueError("Input scaling different")
-        if self.input_shift != self._model.input_shift:
+        if self.input_shift != np.unique(self._model.input_shift):
             raise ValueError("Input shift different")
         return {"input_scaling": self.input_scaling,
                 "input_shift": self.input_shift,

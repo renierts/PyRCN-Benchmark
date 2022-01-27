@@ -1,27 +1,20 @@
-# Template Repository for Research Papers
+# PyRCN: A Toolbox for Exploration and Application of Reservoir Computing Networks
 ## Metadata
-- Author: [Peter Steiner](mailto:peter.steiner@tu-dresden.de)
-- Conference: Forschungsseminar "Sprache und Kognition", 
-Institute for Acoustics and Speech Communication, Technische Universität Dresden, 
-Dresden, Germany
-- Weblink: [https://github.com/renierts/TemplateRepository](https://github.com/renierts/TemplateRepository)
+- Author: [Peter Steiner](mailto:peter.steiner@tu-dresden.de), Azarakhsh Jalalvand, 
+Simon Stone and Peter Birkholz
+- Journal: Engineering Applications of Artificial Intelligence, International 
+Federation of Automatic Control, Elsevier.
+- Weblink: [https://arxiv.org/abs/2103.04807](https://arxiv.org/abs/2103.04807)
 
 ## Summary and Contents
-This is a template repository for code accompanying a research paper and should allow 
-to reproduce the results from the paper.
+This repository contains supplemental material for the research paper entitled "PyRCN:
+ A toolbox for Exploration and Application of Reservoir Computing Networks".
 
-This template provides everything to getting started. and it can directly be used
-for basically any research paper.
+PyRCN is a toolbox for Reservoir Computing Networks (RCNs), which belong to a group of
+machine learning techniques that project the input space non-linearly into a 
+high-dimensional feature spaace. Since we introduce PyRCN, this repository contains 
+all code examples and the entire benchmark test to compare PyRCN with other toolboxes.
 
-We propose to use the following structure of this README:
-- Title of the paper
-- Metadata:
-    - Metadata contains the author names, journal/conference, weblinks, such as the 
-Digital Object Identifier(DOI)etc.
-- Summary and Contents:
-    - The summary is typically not the abstract of the paper but a summary of what the
-     repo containts.
-     - Take care of the Copyright of the publisher
 - File list:
     - The file list contains all files provided in the repository together with a 
     short description.
@@ -33,57 +26,59 @@ Digital Object Identifier(DOI)etc.
     obtained?
     - In case of a Jupyter notebook, it is strongly recommended to add a link to 
     [Binder](https://mybinder.org/).
-- Acknowledgments:
-    - Any kind of required funding information 
-    - other acknowledgments, such as project partners, contributors, family etc.
-- License:
-    - Reference to the license of your code - how can readers re-use it?
-    - Which defaults?
-- Referencing:
-    - How can your work be cited? Ideally, provide a bibtex entry of the paper.
 
 ## File list
 - The following scripts are provided in this repository
-    - `scripts/run.sh`: UNIX Bash script to reproduce the Figures in the paper.
-    - `scripts/run_jupyter-lab.sh`: UNIX Bash script to start the Jupyter Notebook for 
-   the paper.
-    - `scripts/run.bat`: Windows batch script to reproduce the Figures in the paper.
-    - `scripts/run_jupyter-lab.bat`: Windows batch script to start the Jupyter Notebook 
-  for the paper.
+    - `scripts/create_venv.sh`: UNIX Bash script to set up a virtual environment with 
+    all required packages.
+    - `scripts/run.sh`: UNIX Bash script to reproduce the results in the paper.
+    - `scripts/run_jupyter-lab.sh`: UNIX Bash script to start the Jupyter Server for the 
+    experiments.
+    - `scripts/create_venv.ps1`: Windows PowerShell script to set up a virtual 
+    environment with all required packages.
+    - `scripts/run.ps1`: Windows PowerShell script to reproduce the results in the paper.
+    - `scripts/run_jupyter-lab.ps1`: Windows PowerShell script to start the Jupyter Server for the 
+    experiments. 
 - The following python code is provided in `src`
-    - `src/file_handling.py`: Utility functions for storing and loading data and models.
-    - `src/preprocessing.py`: Utility functions for preprocessing the dataset
-    - `src/main.py`: The main script to reproduce all results.
-- `requirements.txt`: Text file containing all required Python modules to be installed
-if we are working in Python. It can be obtained by typing 
-`pip freeze > requirements.txt` in a PowerShell or in a Bash. 
+    - `pyESN/`: The [pyESN](https://github.com/cknd/pyESN) class by 
+    [cknd](https://github.com/cknd/)
+    - `src/adapter.py`: Adapter classes to make other toolboxes sklearn-compatible.
+    - `src/arima.py`: Wrapper functions for ARIMA.
+    - `src/file_handling.py`: Functions to export results as CSV files.
+    - `src/model_selection.py`: Wrapper class around 
+    `sklearn.model_selection.PredefinedSplit` to support splitting a dataset in 
+    training/validation/test.
+    - `src/preprocessing.py`: Utility functions for preprocessing the dataset.
+    - `src/main.py`: The main script to reproduce all results for stock price 
+    volatility prediction.
+    - `src/PyRCN-Intro.ipynb`: The Jupyter-Notebook containing the examples how to set
+     up RCNs using PyRCN and its included building blocks.
+- `requirements.txt`: Text file containing all required Python modules to be installed.
 - `README.md`: The README displayed here.
 - `LICENSE`: Textfile containing the license for this source code. You can find 
-- `data/`: The optional directory `data` contains
-    - `train.csv`: Training data as CSV file
-    - `test.csv`: Test data as CSV file
+- `data/`: The directory `data` contains
+    - `*.csv`: Different datasets provided by Gabriel Trierweiler Ribeiro for [[1]](#1),
+    used for training, validation and test. Of particular interest are:
+    - `CAT.csv`: Caterpillar stock price volatility.
+    - `EBAY.csv`: Ebay stock price volatility.
+    - `MSFT.csv`: Microsoft stock price volatility.
 - `results/`
-    - (Pre)-trained modelss.
-    - Results as CSV file.
-- `.gitignore`: Command file for Github to ignore files with specific extensions. This
-is useful to keep the repository clean. Templates for many programming languages are 
-available [here](https://github.com/github/gitignore).
+    - (Pre)-trained models and results as `sklearn.model_select.RandomizedSearchCV`
+    objects.
+    - For ARIMA, only the scalers are provided for now. The rest follows soon if 
+    required.
+    - ARIMA results still as CSV files.
+- `.gitignore`: Command file for Github to ignore files with Python-specific extensions.
 
 ## Usage
-The easiest way to reproduce the results is to use a service like 
-[Binder](https://mybinder.org/) and run the Jupyter Notebook (if available). It is 
-nowadays highly recommended, because this does not even require a local installation 
-and Jupyter Notebooks are very intuitive to use.
+The easiest way to reproduce the results is to run the Jupyter Notebooks. This is highly 
+recommended, because this does not require a local installation.
 
-Do not forget to add a badge from Binder as below. Therefore, you can simply paste the
-link to your Github repository [here](https://mybinder.org/) and Binder will do the 
-rest for you.
-
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/renierts/TemplateRepository/HEAD?labpath=src%2FExample-Notebook.ipynb)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/TUD-STKS/PyRCN-Benchmark/main)
 
 To run the scripts or to start the Jupyter Notebook locally, at first, please ensure 
 that you have a valid Python distribution installed on your system. Here, at least 
-Python 3.8 is required.
+Python 3.7 is required.
 
 You can then call `run_jupyter-lab.ps1` or `run_jupyter-lab.sh`. This will install a new 
 [Python venv](https://docs.python.org/3/library/venv.html), which is our recommended way 
@@ -98,51 +93,82 @@ in a PowerShell.
 The individual steps to reproduce the results should be in the same order as in the 
 paper. Great would be self-explanatory names for each step.
 
-At first, we import required Python modules and load the dataset, which is already 
-stored in `data`. 
+At first, we define the datasets to be loaded and load them. They are already stored in 
+`data`.
+
+We restrict the data to the stock price volatility of the current day (`t0`).
 
 ```python
-from file_handling import (load_data)
+import pandas as pd
+from collections import OrderedDict
 
 
-training_data = load_data("../data/train.csv")
+    datasets = OrderedDict({"CAT": 0, "EBAY": 1, "MSFT": 2})
+    data = [None] * len(datasets)
+
+    for dataset, k in datasets.items():
+        data[k] = pd.read_csv(f"./data/{dataset}.csv")["t0"].to_frame()
 ```
 
-Since the data is stored as a Pandas dataframe, we can theoretically multiple features. 
-Here, we restrict the data features to the living area. With the function 
-`select_features`, we obtain numpy arrays and the feature transformer that can also be
-used for transforming the test data later. Next, we normalize them to zero mean and 
-unitary variance.
+
+At first, we reproduce the HAR experiments. Essentially, this is a feature 
+transformation of the time series by adding the moving average across 5 and 22 days to
+the original dataset, which consequently has now three dimensions. We achieve that 
+with the `sklearn.pipeline.FeatureUnion`. Afterwards, we normalize the inputs to be 
+between 0 and 1, and regress from the HAR features to the target without regularization.
+
+Since the target is normalized between 0 and 1 as well, we use the  
 
 ```python
-from sklearn.preprocessing import StandardScaler
-from preprocessing import select_features
+from sklearn.preprocessing import FunctionTransformer, MinMaxScaler
+from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.compose import TransformedTargetRegressor
+from preprocessing import compute_average_volatility
 
 
-X, y, feature_trf = select_features(
-    df=training_data, input_features=["GrLivArea"], target="SalePrice")
-scaler = StandardScaler().fit(X)
-X_train = scaler.transform(X)
-y_train = y
+day_volatility_transformer = FunctionTransformer(
+                func=compute_average_volatility, kw_args={"window_length": 1})
+week_volatility_transformer = FunctionTransformer(
+    func=compute_average_volatility, kw_args={"window_length": 5})
+month_volatility_transformer = FunctionTransformer(
+    func=compute_average_volatility, kw_args={"window_length": 22})
+har_features = FeatureUnion(
+    transformer_list=[("day", day_volatility_transformer),
+                      ("week", week_volatility_transformer),
+                      ("month", month_volatility_transformer)])
+har_pipeline = Pipeline(
+    steps=[("har_features", har_features),
+           ("scaler", MinMaxScaler()),
+           ("lstsq", TransformedTargetRegressor(
+               transformer=MinMaxScaler()))])
 ```
 
 We optimize a model using a random search.
 
 ```python
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.utils.fixes import loguniform
-from scipy.stats import uniform
+from preprocessing import ts2super
+import itertools
+from model_selection import PredefinedTrainValidationTestSplit
+from sklearn.model_selection import GridSearchCV
 
-from pyrcn.extreme_learning_machine import ELMRegressor
 
+# Prepare data
+df = pd.concat([ts2super(d, 0, H) for d in data])
+X = df.iloc[:, 0].values.reshape(-1, 1)
+y = df.iloc[:, -1].values.reshape(-1, 1)
+test_fold = [
+    [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+test_fold = list(itertools.chain.from_iterable(test_fold))
 
-model = RandomizedSearchCV(
-    estimator=ELMRegressor(input_activation="relu", random_state=42,
-                           hidden_layer_size=50),
-    param_distributions={"input_scaling": uniform(loc=0, scale=2),
-                         "bias_scaling": uniform(loc=0, scale=2),
-                         "alpha": loguniform(1e-5, 1e1)},
-    random_state=42, n_iter=200, refit=True).fit(X, y)
+ps = PredefinedTrainValidationTestSplit(
+    test_fold=test_fold, validation=False)
+
+# Run model selection
+search = GridSearchCV(
+    estimator=har_pipeline, param_grid={}, cv=ps,
+    scoring={"MSE": "neg_mean_squared_error",
+             "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
+    refit="R2", return_train_score=True).fit(X, y)
 ```
 
 We load and transform test data.
@@ -178,11 +204,12 @@ order to reproduce all results in the paper.
 If you want to suppress any options, simply remove the particular option.
 
 ## Acknowledgements
-This research was supported by
-```
-Nobody
-```
+This research was supported by Europäischer Sozialfonds (ESF), the Free State of Saxony
+(Application number: 100327771) and Ghent University under the Special Research Award
+number BOF19/PDO/134.
 
+We kindly thank Gabriel Trierweiler Ribeiro for his support and expertise regarding the 
+stock price volatility datasets.
 
 ## License and Referencing
 This program is licensed under the GPLv3 license. If you in any way use this
@@ -191,11 +218,21 @@ article listed above.
 
 You can use the following BibTeX entry
 ```
-@inproceedings{src:Steiner-22,
-  author    = "Peter Steiner",
-  title     = "Template Repository for Research Papers",
-  booktitle = "Proceedings of the Research Seminar",
-  year      = 2022,
-  pages     = "1--6",
+@misc{steiner2022pyrcn,
+      title={PyRCN: A Toolbox for Exploration and Application of Reservoir Computing Networks}, 
+      author={Peter Steiner and Azarakhsh Jalalvand and Simon Stone and Peter Birkholz},
+      year={2022},
+      eprint={2103.04807},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
 }
 ```
+
+## References
+<a id="1">[1]</a> 
+Gabriel Trierweiler Ribeiro, André Alves Portela Santos, Viviana Cocco Mariani, 
+Leandro dos Santos Coelho. (2021). 
+Novel hybrid model based on echo state neural network applied to the prediction of stock 
+price return volatility. 
+Expert Systems with Applications, 184, 115490. 
+[10.1016/j.eswa.2021.115490](https://doi.org/10.1016/j.eswa.2021.115490)

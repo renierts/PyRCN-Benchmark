@@ -41,6 +41,21 @@ def split_datasets(data, idx_matrix):
 
 
 def compute_average_volatility(X, window_length):
+    """
+    Compute the moving average volatility over a window of samples.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape=(n_samples, 1)
+        one-dimensional input time series.
+    window_length : int
+
+    Returns
+    -------
+    X_new : np.ndarray, shape=(n_samples, 1)
+        moving average across the input time series.
+    """
+    # Make sure to use the mode "full" but to return len(X) samples.
     X_new = np.convolve(X.ravel(), np.ones(window_length) / window_length,
                         mode="full").reshape(-1, 1)[:len(X)]
     return X_new
