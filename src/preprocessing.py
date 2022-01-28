@@ -8,6 +8,7 @@ Preprocessing utilities required to reproduce the results in the paper
 import pandas as pd
 from pandas import DataFrame
 import numpy as np
+from statsmodels.tsa.tsatools import lagmat
 
 
 def ts2super(ts: DataFrame, n_lags: int, h: int):
@@ -36,10 +37,6 @@ def ts2super(ts: DataFrame, n_lags: int, h: int):
     return data_super
 
 
-def split_datasets(data, idx_matrix):
-    return data[idx_matrix[0]], data[idx_matrix[1]], data[idx_matrix[2]]
-
-
 def compute_average_volatility(X, window_length):
     """
     Compute the moving average volatility over a window of samples.
@@ -58,4 +55,9 @@ def compute_average_volatility(X, window_length):
     # Make sure to use the mode "full" but to return len(X) samples.
     X_new = np.convolve(X.ravel(), np.ones(window_length) / window_length,
                         mode="full").reshape(-1, 1)[:len(X)]
+
+    """
+    lag_array = lagmat(X, window_length)
+    X_new = np.mean(lag_array[:, 0: window_length], 1).reshape(-1, 1)
+    """
     return X_new

@@ -1,6 +1,6 @@
 """
 Main Code to reproduce the results in the paper
-'yRCN: A Toolbox for Exploration and Application of Reservoir Computing
+'PyRCN: A Toolbox for Exploration and Application of Reservoir Computing
 Networks'.
 """
 
@@ -8,24 +8,19 @@ Networks'.
 # License: BSD 3 clause
 
 import logging
-import numpy as np
-import src.arima as arima
-from src.preprocessing import (
-    ts2super, split_datasets, compute_average_volatility)
-from src.file_handling import export_results
+
+from src.preprocessing import ts2super, compute_average_volatility
 from src.model_selection import PredefinedTrainValidationTestSplit
 from src.adapter import PyESN, ReservoirPyESN
 import pandas as pd
 import itertools
 from sklearn.base import clone
-from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import MinMaxScaler, FunctionTransformer
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.pipeline import FeatureUnion, Pipeline
-from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from joblib import dump, load
-from collections import OrderedDict, deque
+from collections import OrderedDict
 from sklearn.utils.fixes import loguniform
 from scipy.stats import uniform
 
@@ -35,8 +30,8 @@ from pyrcn.model_selection import SequentialSearchCV
 from skelm import ELMRegressor as SkELMRegressor
 import seaborn as sns
 import matplotlib.pyplot as plt
-from arch.univariate import HARX
 
+from arch.univariate import HARX
 
 sns.set_theme(context="paper")
 
@@ -110,11 +105,16 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
     for H in [1, 5, 21]:
         # Prepare data
         LOGGER.info(f"Preparing the dataset for the horizon {H}...")
-        df = pd.concat([ts2super(d, 0, H) for d in data])
+        df = []
+        for d in data:
+            df.append(ts2super(d, 0, H))
+            df[-1][["HAR1", "HAR5", "HAR22"]] = har_features.transform(
+                df[-1].iloc[:, 0])
+        df = pd.concat(df).reset_index(drop=True)
         X = df.iloc[:, 0].values.reshape(-1, 1)
-        y = df.iloc[:, -1].values.reshape(-1, 1)
-        test_fold = [
-            [k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
+        X_HAR = df.iloc[:, 2:].values
+        y = df.iloc[:, 1].values.reshape(-1, 1)
+        test_fold = [[k] * len(ts2super(d, 0, H)) for k, d in enumerate(data)]
         test_fold = list(itertools.chain.from_iterable(test_fold))
 
         ps = PredefinedTrainValidationTestSplit(
@@ -132,7 +132,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search, f'./results/har_grid_h{H}.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search.cv_results_['mean_train_R2']}\t"
                         f"{search.cv_results_['mean_test_R2']}\t"
@@ -203,7 +203,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/pyrcn_seq_esn_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -275,7 +275,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/pyrcn_har_seq_esn_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -338,7 +338,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/pyrcn_seq_elm_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -402,7 +402,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/pyrcn_har_seq_elm_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -452,7 +452,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/skelm_seq_elm_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -503,7 +503,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/skelm_har_seq_elm_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -566,12 +566,12 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
             search_final = GridSearchCV(
                 estimator=clone(search.best_estimator_),
                 param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_test,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_final, f'./results/pyrcn_seq_h{H}_final.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -637,12 +637,12 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
             search_final = GridSearchCV(
                 estimator=clone(search.best_estimator_),
                 param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_final,
+                    50, 100, 200, 400, 800, 1600]}, cv=ps_test,
                 scoring={"MSE": "neg_mean_squared_error",
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_final, f'./results/pyrcn_har_seq_h{H}_final.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -702,7 +702,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/pyesn_seq_esn_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
@@ -763,7 +763,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                          "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
                 refit="R2", return_train_score=True).fit(X, y)
             dump(search_test, f'./results/pyesn_har_seq_esn_h{H}_test.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time"
+            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
                         f"in ms\tScore time in ms")
             LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
                         f"{search_test.cv_results_['mean_test_R2']}\t"
