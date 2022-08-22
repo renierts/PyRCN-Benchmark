@@ -15,18 +15,6 @@ machine learning techniques that project the input space non-linearly into a
 high-dimensional feature spaace. Since we introduce PyRCN, this repository contains 
 all code examples and the entire benchmark test to compare PyRCN with other toolboxes.
 
-- File list:
-    - The file list contains all files provided in the repository together with a 
-    short description.
-- Usage:
-    - How can users get started with your research code. This contains setting up a 
-    installing packages in a virtual environment `venv` and running one `main.py` that
-    includes your main code. 
-    - Very important and often forgotten: How can the data to reproduce the results be
-    obtained?
-    - In case of a Jupyter notebook, it is strongly recommended to add a link to 
-    [Binder](https://mybinder.org/).
-
 ## File list
 - The following scripts are provided in this repository
     - `scripts/create_venv.sh`: UNIX Bash script to set up a virtual environment with 
@@ -78,7 +66,7 @@ recommended, because this does not require a local installation.
 
 To run the scripts or to start the Jupyter Notebook locally, at first, please ensure 
 that you have a valid Python distribution installed on your system. Here, at least 
-Python 3.7 is required.
+Python 3.8 is required.
 
 You can then call `run_jupyter-lab.ps1` or `run_jupyter-lab.sh`. This will install a new 
 [Python venv](https://docs.python.org/3/library/venv.html), which is our recommended way 
@@ -218,13 +206,16 @@ article listed above.
 
 You can use the following BibTeX entry
 ```
-@misc{steiner2022pyrcn,
-      title={PyRCN: A Toolbox for Exploration and Application of Reservoir Computing Networks}, 
-      author={Peter Steiner and Azarakhsh Jalalvand and Simon Stone and Peter Birkholz},
-      year={2022},
-      eprint={2103.04807},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
+@article{Steiner2022pyrcn,
+	title = {PyRCN: A Toolbox for Exploration and Application of Reservoir Computing Networks},
+	journal = {Engineering Applications of Artificial Intelligence},
+	volume = {113},
+	pages = {104964},
+	year = {2022},
+	issn = {0952-1976},
+	doi = {10.1016/j.engappai.2022.104964},
+	url = {https://www.sciencedirect.com/science/article/pii/S0952197622001713},
+	author = {Peter Steiner and Azarakhsh Jalalvand and Simon Stone and Peter Birkholz},
 }
 ```
 
