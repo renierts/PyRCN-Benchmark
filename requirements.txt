@@ -1,5 +1,6 @@
 numpy
 joblib
+dask[distributed]
 pyrcn
 pandas
 statsmodels

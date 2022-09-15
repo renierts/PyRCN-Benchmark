@@ -68,6 +68,11 @@ To run the scripts or to start the Jupyter Notebook locally, at first, please en
 that you have a valid Python distribution installed on your system. Here, at least 
 Python 3.8 is required.
 
+Next, you need to clone the repository. please note that we require the remote 
+repository PyESN to be cloned as well. To do so, please clone the repository using 
+`clone --recurse-submodules https://github.com/TUD-STKS/PyRCN-Benchmark.git`. In that 
+way, the directory `PyESN` does not remain empty.
+
 You can then call `run_jupyter-lab.ps1` or `run_jupyter-lab.sh`. This will install a new 
 [Python venv](https://docs.python.org/3/library/venv.html), which is our recommended way 
 of getting started.
