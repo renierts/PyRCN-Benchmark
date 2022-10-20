@@ -31,7 +31,6 @@ from skelm import ELMRegressor as SkELMRegressor
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from arch.univariate import HARX
 
 sns.set_theme(context="paper")
 
