@@ -1,3 +1,3 @@
-[submodule "src/pyESN"]
-	path = src/pyESN
-	url = https://github.com/renierts/pyESN
+[submodule "src/adapter/pyESN"]
+	path = src/adapter/pyESN
+	url = https://github.com/cknd/pyESN
