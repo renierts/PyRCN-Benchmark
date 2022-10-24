@@ -9,9 +9,9 @@ Networks'.
 
 import logging
 
-from src.preprocessing import ts2super, compute_average_volatility
-from src.model_selection import PredefinedTrainValidationTestSplit
-from src.adapter import PyESN, ReservoirPyESN
+from preprocessing import ts2super, compute_average_volatility
+from model_selection import PredefinedTrainValidationTestSplit
+from adapter import PyESN
 import pandas as pd
 import itertools
 from sklearn.base import clone
