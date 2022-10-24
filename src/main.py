@@ -41,8 +41,7 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
          fit_har_pyrcn_esn: bool = False, fit_pyrcn_elm: bool = False,
          fit_har_pyrcn_elm: bool = False, fit_skelm_elm: bool = False,
          fit_har_skelm_elm: bool = False, fit_pyesn_esn: bool = False,
-         fit_har_pyesn_esn: bool = False, fit_reservoirpy_esn: bool = False,
-         fit_har_reservoirpy_esn: bool = False) -> None:
+         fit_har_pyesn_esn: bool = False) -> None:
     """
     This is the main function to reproduce all visualizations and models for
     the paper "Template Repository for Research Papers with Python Code".
@@ -69,10 +68,6 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
         Fit ESN models with PyESN.
     fit_har_pyesn_esn:
         Fit ESN models with PyESN.
-    fit_reservoirpy_esn:
-        Fit ESN models with ReservoirPy.
-    fit_har_reservoirpy_esn:
-        Fit ESN models with ReservoirPy.
     """
     datasets = OrderedDict({"CAT": 0, "EBAY": 1, "MSFT": 2})
     data = [None] * len(datasets)
@@ -511,145 +506,6 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                         f"{search_test.cv_results_['mean_fit_time']*1e3}\t"
                         f"{search_test.cv_results_['mean_score_time']*1e3}")
             LOGGER.info("    ... done!")
-        if fit_reservoirpy_esn:
-            LOGGER.info(f"    Starting the ESN experiment with ReservoirPy...")
-            LOGGER.info(f"    Creating feature extraction and ESN pipeline...")
-            initial_esn_params = {
-                'units': 50, 'lr': 1.0, 'sr': 0.0, 'noise_rc': 1e-5,
-                'input_scaling': 0.4, 'fb_scaling': 1.0,
-                'input_connectivity': 0.1, 'rc_connectivity': 0.1,
-                'seed': 42, 'ridge': 1e-5}
-            esn_pipeline = Pipeline(
-                steps=[("scaler", MinMaxScaler()),
-                       ("esn", TransformedTargetRegressor(
-                           regressor=ReservoirPyESN(**initial_esn_params),
-                           transformer=MinMaxScaler()))])
-            LOGGER.info("    ... done!")
-            # Run model selection
-            LOGGER.info(f"    Performing the grid search...")
-            step1_params = {
-                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
-                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
-            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
-            step3_params = {
-                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
-            step4_params = {'esn__regressor__ridge': loguniform(1e-5, 1e1)}
-            scoring = {
-                "MSE": "neg_mean_squared_error",
-                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
-            }
-            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-
-            searches = [
-                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
-                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
-                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
-                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
-            search = SequentialSearchCV(
-                esn_pipeline, searches=searches).fit(X, y)
-            dump(search, f'./results/pyrcn_seq_h{H}.joblib')
-
-            LOGGER.info("    ... done!")
-            LOGGER.info("    Final evaluation...")
-            search_final = GridSearchCV(
-                estimator=clone(search.best_estimator_),
-                param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_test,
-                scoring={"MSE": "neg_mean_squared_error",
-                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
-                refit="R2", return_train_score=True).fit(X, y)
-            dump(search_final, f'./results/pyrcn_seq_h{H}_final.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
-                        f"in ms\tScore time in ms")
-            LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
-                        f"{search_test.cv_results_['mean_test_R2']}\t"
-                        f"{search_test.cv_results_['mean_train_MSE']}\t"
-                        f"{search_test.cv_results_['mean_test_MSE']}\t"
-                        f"{search_test.cv_results_['mean_fit_time']*1e3}\t"
-                        f"{search_test.cv_results_['mean_score_time']*1e3}")
-            LOGGER.info("    ... done!")
-        if fit_har_reservoirpy_esn:
-            LOGGER.info(f"    Starting the HAR-ESN experiment with "
-                        f"ReservoirPy...")
-            LOGGER.info(f"    Creating HAR-ESN pipeline...")
-            initial_esn_params = {
-                'hidden_layer_size': 50, 'k_in': 2, 'input_scaling': 0.4,
-                'input_activation': 'identity', 'bias_scaling': 0.0,
-                'spectral_radius': 0.0, 'leakage': 1.0, 'k_rec': 10,
-                'reservoir_activation': 'tanh', 'bidirectional': False,
-                'alpha': 1e-5, 'random_state': 42}
-            esn_pipeline = Pipeline(
-                steps=[("har_features", har_features),
-                       ("scaler", MinMaxScaler()),
-                       ("esn", TransformedTargetRegressor(
-                           regressor=ESNRegressor(**initial_esn_params),
-                           transformer=MinMaxScaler()))])
-            LOGGER.info("    ... done!")
-            # Run model selection
-            LOGGER.info(f"    Performing the grid search...")
-            step1_params = {
-                'esn__regressor__input_scaling': uniform(loc=1e-2, scale=1),
-                'esn__regressor__spectral_radius': uniform(loc=0, scale=2)}
-            step2_params = {'esn__regressor__leakage': uniform(1e-5, 1e0)}
-            step3_params = {
-                'esn__regressor__bias_scaling': uniform(loc=0, scale=3)}
-            step4_params = {'esn__regressor__alpha': loguniform(1e-5, 1e1)}
-            scoring = {
-                "MSE": "neg_mean_squared_error",
-                "RMSE": "neg_root_mean_squared_error", "R2": "r2"
-            }
-            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step2 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step3 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-            kwargs_step4 = {'n_iter': 50, 'random_state': 42, 'verbose': 1,
-                            'n_jobs': -1, 'scoring': scoring, "refit": "R2",
-                            "cv": ps, "return_train_score": True}
-
-            searches = [
-                ('step1', RandomizedSearchCV, step1_params, kwargs_step1),
-                ('step2', RandomizedSearchCV, step2_params, kwargs_step2),
-                ('step3', RandomizedSearchCV, step3_params, kwargs_step3),
-                ('step4', RandomizedSearchCV, step4_params, kwargs_step4)]
-            search = SequentialSearchCV(
-                esn_pipeline, searches=searches).fit(X, y)
-            dump(search, f'./results/pyrcn_har_seq_h{H}.joblib')
-
-            LOGGER.info("    ... done!")
-            LOGGER.info("    Final evaluation...")
-            search_final = GridSearchCV(
-                estimator=clone(search.best_estimator_),
-                param_grid={"esn__regressor__hidden_layer_size": [
-                    50, 100, 200, 400, 800, 1600]}, cv=ps_test,
-                scoring={"MSE": "neg_mean_squared_error",
-                         "RMSE": "neg_root_mean_squared_error", "R2": "r2"},
-                refit="R2", return_train_score=True).fit(X, y)
-            dump(search_final, f'./results/pyrcn_har_seq_h{H}_final.joblib')
-            LOGGER.info(f"R^2 train\tR^2 test\tMSE train\tMSE test\tFit time "
-                        f"in ms\tScore time in ms")
-            LOGGER.info(f"{search_test.cv_results_['mean_train_R2']}\t"
-                        f"{search_test.cv_results_['mean_test_R2']}\t"
-                        f"{search_test.cv_results_['mean_train_MSE']}\t"
-                        f"{search_test.cv_results_['mean_test_MSE']}\t"
-                        f"{search_test.cv_results_['mean_fit_time']*1e3}\t"
-                        f"{search_test.cv_results_['mean_score_time']*1e3}")
-            LOGGER.info("    ... done!")
         if fit_pyesn_esn:
             LOGGER.info(f"    Starting the ESN experiment with PyESN...")
             LOGGER.info(f"    Creating ESN pipeline...")
@@ -739,10 +595,10 @@ def main(fit_har: bool = False, fit_pyrcn_esn: bool = False,
                 "MSE": "neg_mean_squared_error",
                 "RMSE": "neg_root_mean_squared_error", "R2": "r2"
             }
-            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+            kwargs_step1 = {'n_iter': 200, 'random_state': 42, 'verbose': 10,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
-            kwargs_step2 = {'n_iter': 200, 'random_state': 42, 'verbose': 1,
+            kwargs_step2 = {'n_iter': 200, 'random_state': 42, 'verbose': 10,
                             'n_jobs': -1, 'scoring': scoring, "refit": "R2",
                             "cv": ps, "return_train_score": True}
 
@@ -783,8 +639,6 @@ if __name__ == "__main__":
     parser.add_argument("--fit_har_pyrcn_elm", action="store_true")
     parser.add_argument("--fit_skelm_elm", action="store_true")
     parser.add_argument("--fit_har_skelm_elm", action="store_true")
-    parser.add_argument("--fit_reservoirpy_esn", action="store_true")
-    parser.add_argument("--fit_har_reservoirpy_esn", action="store_true")
     parser.add_argument("--fit_pyesn_esn", action="store_true")
     parser.add_argument("--fit_har_pyesn_esn", action="store_true")
     args = vars(parser.parse_args())

@@ -7,6 +7,6 @@ python.exe -m venv .virtualenv
 
 .\.virtualenv\Scripts\activate.ps1
 python.exe -m pip install -r requirements.txt
-python.exe .\src\main.py --fit_reservoirpy_esn
+python.exe .\src\main.py --fit_pyrcn_esn
 
 deactivate

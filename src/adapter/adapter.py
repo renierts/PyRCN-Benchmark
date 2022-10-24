@@ -1,5 +1,5 @@
 """This module contains various adapter classes for toolboxes to sklearn."""
-from src.pyESN.pyESN import ESN, identity
+from .pyESN.pyESN import ESN, identity
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import _deprecate_positional_args
 from reservoirpy.nodes import Reservoir, Ridge
