@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# "Template Repository for Research Papers with Python Code"
+# "PyRCN: A Toolbox for Exploration and Application of Reservoir Computing Networks"
 #
 # Copyright (C) 2022 Peter Steiner
 # License: GPLv3

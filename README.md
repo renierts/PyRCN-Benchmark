@@ -73,7 +73,9 @@ repository PyESN to be cloned as well. To do so, please clone the repository usi
 `clone --recurse-submodules https://github.com/TUD-STKS/PyRCN-Benchmark.git`. In that 
 way, the directory `PyESN` does not remain empty.
 
-You can then call `run_jupyter-lab.ps1` or `run_jupyter-lab.sh`. This will install a new 
+Next, please navigate to the newly created directory by typing `cd PyRCN-Benchmark` in
+the command line. From there, you can then call `scripts/run_jupyter-lab.ps1` or 
+`scripts/run_jupyter-lab.sh`. This will install a new 
 [Python venv](https://docs.python.org/3/library/venv.html), which is our recommended way 
 of getting started.
 
