@@ -51,12 +51,10 @@ all code examples and the entire benchmark test to compare PyRCN with other tool
     - `EBAY.csv`: Ebay stock price volatility.
     - `MSFT.csv`: Microsoft stock price volatility.
 - `results/`
-    - (Pre)-trained models and results as `sklearn.model_select.RandomizedSearchCV`
-    objects.
-    - For ARIMA, only the scalers are provided for now. The rest follows soon if 
-    required.
-    - ARIMA results still as CSV files.
-- `.gitignore`: Command file for Github to ignore files with Python-specific extensions.
+    - (Pre)-trained models can be downloaded from 
+      [here](https://drive.google.com/drive/folders/1XeZJ4mT7zc1bB1Q68lrgKlrej4-AmWYS?usp=sharing)
+    - The models and results are stored as `sklearn.model_select.RandomizedSearchCV` 
+      objects.
 
 ## Usage
 The easiest way to reproduce the results is to run the Jupyter Notebooks. This is highly 
